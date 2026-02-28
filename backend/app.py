@@ -2,7 +2,7 @@
 Flask Backend - داشبورد مستضاف
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 from flask_cors import CORS
 import sqlite3
 import json
@@ -14,6 +14,36 @@ CORS(app)
 
 # قاعدة البيانات - في نفس مجلد backend للـ Render
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
+
+# ============= مصادقة المستخدم =============
+# في الإنتاج: استخدم bcrypt + قاعدة بيانات
+AUTH_USERNAME = "dca"
+AUTH_PASSWORD = "dca2026@iraq"  # غيّر هذا!
+
+import base64
+
+def check_auth(username, password):
+    """التحقق من اسم المستخدم وكلمة المرور"""
+    return username == AUTH_USERNAME and password == AUTH_PASSWORD
+
+def authenticate():
+    """طلب المصادقة"""
+    return Response(
+        '🔒 تسجيل الدخول مطلوب',
+        401,
+        {'WWW-Authenticate': 'Basic realm="DCA Dashboard"'}
+    )
+
+def requires_auth(f):
+    """ديكوريتور للمصادقة"""
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
 
 def get_db():
     """الاتصال بقاعدة البيانات"""
@@ -88,6 +118,7 @@ def init_db():
 # ============= API ROUTES =============
 
 @app.route('/')
+@requires_auth
 def dashboard():
     """الصفحة الرئيسية"""
     return render_template('index.html')
@@ -95,6 +126,7 @@ def dashboard():
 # --- Businesses ---
 
 @app.route('/api/businesses', methods=['GET'])
+@requires_auth
 def get_businesses():
     """جلب جميع الزبائن"""
     status = request.args.get('status')
@@ -113,6 +145,7 @@ def get_businesses():
     return jsonify({'success': True, 'businesses': businesses})
 
 @app.route('/api/businesses', methods=['POST'])
+@requires_auth
 def add_business():
     """إضافة زبون جديد"""
     data = request.json
@@ -138,6 +171,7 @@ def add_business():
     return jsonify({'success': True, 'id': business_id})
 
 @app.route('/api/businesses/<int:business_id>', methods=['GET'])
+@requires_auth
 def get_business(business_id):
     """جلب زبون معين"""
     conn = get_db()
@@ -151,6 +185,7 @@ def get_business(business_id):
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
 @app.route('/api/businesses/<int:business_id>/status', methods=['PUT'])
+@requires_auth
 def update_status(business_id):
     """تحديث حالة الزبون"""
     data = request.json
@@ -179,6 +214,7 @@ def update_status(business_id):
     return jsonify({'success': True})
 
 @app.route('/api/businesses/<int:business_id>', methods=['DELETE'])
+@requires_auth
 def delete_business(business_id):
     """حذف زبون"""
     conn = get_db()
@@ -192,6 +228,7 @@ def delete_business(business_id):
 # --- Stats ---
 
 @app.route('/api/stats', methods=['GET'])
+@requires_auth
 def get_stats():
     """الإحصائيات"""
     conn = get_db()
@@ -224,6 +261,7 @@ def get_stats():
 # --- Settings ---
 
 @app.route('/api/settings', methods=['GET'])
+@requires_auth
 def get_settings():
     """الإعدادات"""
     conn = get_db()
@@ -236,6 +274,7 @@ def get_settings():
     return jsonify({'success': True, 'settings': settings})
 
 @app.route('/api/settings', methods=['PUT'])
+@requires_auth
 def update_settings():
     """تحديث الإعدادات"""
     data = request.json
@@ -254,6 +293,7 @@ def update_settings():
 # --- Permissions ---
 
 @app.route('/api/permissions', methods=['GET'])
+@requires_auth
 def get_permissions():
     """الصلاحيات"""
     conn = get_db()
@@ -266,6 +306,7 @@ def get_permissions():
     return jsonify({'success': True, 'permissions': permissions})
 
 @app.route('/api/permissions/<key>', methods=['PUT'])
+@requires_auth
 def toggle_permission(key):
     """تبديل صلاحية"""
     conn = get_db()

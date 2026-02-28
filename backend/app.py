@@ -327,8 +327,10 @@ def toggle_permission(key):
 
 # ============= MAIN =============
 
+# تشغيل init_db عند تحميل الموديول (لـ gunicorn)
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     print("=" * 50)
     print("DCA Dashboard Server")
     print("=" * 50)

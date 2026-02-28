@@ -151,7 +151,7 @@
         async function loadData() {
             try {
                 // إحصائيات
-                const statsRes = await fetch(`${API_URL}/stats`);
+                const statsRes = await fetch(`${API_URL}/stats`, {credentials: 'include'});
                 const statsData = await statsRes.json();
                 if (statsData.success) {
                     document.getElementById('stat-prospects').textContent = statsData.stats.prospects;
@@ -164,7 +164,7 @@
                 await loadBusinesses();
                 
                 // الصلاحيات
-                const permRes = await fetch(`${API_URL}/permissions`);
+                const permRes = await fetch(`${API_URL}/permissions`, {credentials: 'include'});
                 const permData = await permRes.json();
                 if (permData.success) {
                     Object.keys(permData.permissions).forEach(key => {
@@ -182,9 +182,9 @@
         
         async function loadBusinesses() {
             const [prospectRes, sentRes, soldRes] = await Promise.all([
-                fetch(`${API_URL}/businesses?status=prospect`),
-                fetch(`${API_URL}/businesses?status=sent`),
-                fetch(`${API_URL}/businesses?status=sold`)
+                fetch(`${API_URL}/businesses?status=prospect`, {credentials: 'include'}),
+                fetch(`${API_URL}/businesses?status=sent`, {credentials: 'include'}),
+                fetch(`${API_URL}/businesses?status=sold`, {credentials: 'include'})
             ]);
             
             const prospects = await prospectRes.json();
@@ -256,6 +256,7 @@
             const res = await fetch(`${API_URL}/businesses`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ name, phone, category, address, description })
             });
             
@@ -275,6 +276,7 @@
             await fetch(`${API_URL}/businesses/${id}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ status: 'sent' })
             });
             loadData();
@@ -286,6 +288,7 @@
                 await fetch(`${API_URL}/businesses/${id}/status`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ status: 'sold', price: parseInt(price) })
                 });
                 loadData();
@@ -293,7 +296,7 @@
         }
         
         async function togglePermission(key) {
-            const res = await fetch(`${API_URL}/permissions/${key}`, { method: 'PUT' });
+            const res = await fetch(`${API_URL}/permissions/${key}`, { method: 'PUT', credentials: 'include' });
             const data = await res.json();
             if (data.success) {
                 const toggle = document.getElementById('toggle-' + key);

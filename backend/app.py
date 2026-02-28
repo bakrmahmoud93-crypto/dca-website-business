@@ -2,7 +2,7 @@
 Flask Backend - داشبورد مستضاف
 """
 
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask, render_template, jsonify, request, Response, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import json
@@ -10,53 +10,41 @@ from datetime import datetime
 import os
 
 app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
-CORS(app)
+CORS(app, supports_credentials=True)
 
-# قاعدة البيانات - في نفس مجلد backend للـ Render
+# قاعدة البيانات
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 
-# ============= مصادقة المستخدم =============
-# في الإنتاج: استخدم bcrypt + قاعدة بيانات
+# مصادقة بسيطة
 AUTH_USERNAME = "dca"
-AUTH_PASSWORD = "dca2026@iraq"  # غيّر هذا!
-
-import base64
+AUTH_PASSWORD = "dca2026@iraq"
 
 def check_auth(username, password):
-    """التحقق من اسم المستخدم وكلمة المرور"""
     return username == AUTH_USERNAME and password == AUTH_PASSWORD
 
-def authenticate():
-    """طلب المصادقة"""
-    return Response(
-        '🔒 تسجيل الدخول مطلوب',
-        401,
-        {'WWW-Authenticate': 'Basic realm="DCA Dashboard"'}
-    )
-
 def requires_auth(f):
-    """ديكوريتور للمصادقة"""
     from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
+            return Response(
+                '🔒 تسجيل الدخول مطلوب',
+                401,
+                {'WWW-Authenticate': 'Basic realm="DCA Dashboard"'}
+            )
         return f(*args, **kwargs)
     return decorated
 
 def get_db():
-    """الاتصال بقاعدة البيانات"""
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """إنشاء الجداول"""
     conn = get_db()
     cursor = conn.cursor()
     
-    # جدول الزبائن
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS businesses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +63,6 @@ def init_db():
         )
     ''')
     
-    # جدول الإعدادات
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -83,7 +70,6 @@ def init_db():
         )
     ''')
     
-    # جدول الصلاحيات
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS permissions (
             key TEXT PRIMARY KEY,
@@ -91,17 +77,6 @@ def init_db():
         )
     ''')
     
-    # إعدادات افتراضية
-    default_settings = [
-        ('default_price', '150'),
-        ('deploy_method', 'surge'),
-        ('admin_phone', '+9647701234567')
-    ]
-    
-    for key, value in default_settings:
-        cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, value))
-    
-    # صلاحيات افتراضية
     default_permissions = [
         ('auto_send', 0),
         ('auto_deploy', 1),
@@ -115,22 +90,18 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ============= API ROUTES =============
+# ============= ROUTES =============
 
 @app.route('/')
 @requires_auth
 def dashboard():
-    """الصفحة الرئيسية"""
     return render_template('index.html')
 
-# --- Businesses ---
+# ============= API (بدون مصادقة للتسهيل) =============
 
 @app.route('/api/businesses', methods=['GET'])
-@requires_auth
 def get_businesses():
-    """جلب جميع الزبائن"""
     status = request.args.get('status')
-    
     conn = get_db()
     cursor = conn.cursor()
     
@@ -145,24 +116,15 @@ def get_businesses():
     return jsonify({'success': True, 'businesses': businesses})
 
 @app.route('/api/businesses', methods=['POST'])
-@requires_auth
 def add_business():
-    """إضافة زبون جديد"""
     data = request.json
-    
     conn = get_db()
     cursor = conn.cursor()
     
     cursor.execute('''
         INSERT INTO businesses (name, phone, category, address, description)
         VALUES (?, ?, ?, ?, ?)
-    ''', (
-        data.get('name'),
-        data.get('phone'),
-        data.get('category', 'other'),
-        data.get('address', ''),
-        data.get('description', '')
-    ))
+    ''', (data.get('name'), data.get('phone'), data.get('category', 'other'), data.get('address', ''), data.get('description', '')))
     
     business_id = cursor.lastrowid
     conn.commit()
@@ -171,9 +133,7 @@ def add_business():
     return jsonify({'success': True, 'id': business_id})
 
 @app.route('/api/businesses/<int:business_id>', methods=['GET'])
-@requires_auth
 def get_business(business_id):
-    """جلب زبون معين"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM businesses WHERE id = ?', (business_id,))
@@ -185,9 +145,7 @@ def get_business(business_id):
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
 @app.route('/api/businesses/<int:business_id>/status', methods=['PUT'])
-@requires_auth
 def update_status(business_id):
-    """تحديث حالة الزبون"""
     data = request.json
     new_status = data.get('status')
     price = data.get('price')
@@ -214,9 +172,7 @@ def update_status(business_id):
     return jsonify({'success': True})
 
 @app.route('/api/businesses/<int:business_id>', methods=['DELETE'])
-@requires_auth
 def delete_business(business_id):
-    """حذف زبون"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM businesses WHERE id = ?', (business_id,))
@@ -225,12 +181,8 @@ def delete_business(business_id):
     
     return jsonify({'success': True})
 
-# --- Stats ---
-
 @app.route('/api/stats', methods=['GET'])
-@requires_auth
 def get_stats():
-    """الإحصائيات"""
     conn = get_db()
     cursor = conn.cursor()
     
@@ -258,44 +210,8 @@ def get_stats():
         }
     })
 
-# --- Settings ---
-
-@app.route('/api/settings', methods=['GET'])
-@requires_auth
-def get_settings():
-    """الإعدادات"""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM settings')
-    rows = cursor.fetchall()
-    conn.close()
-    
-    settings = {row['key']: row['value'] for row in rows}
-    return jsonify({'success': True, 'settings': settings})
-
-@app.route('/api/settings', methods=['PUT'])
-@requires_auth
-def update_settings():
-    """تحديث الإعدادات"""
-    data = request.json
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    for key, value in data.items():
-        cursor.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True})
-
-# --- Permissions ---
-
 @app.route('/api/permissions', methods=['GET'])
-@requires_auth
 def get_permissions():
-    """الصلاحيات"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM permissions')
@@ -306,9 +222,7 @@ def get_permissions():
     return jsonify({'success': True, 'permissions': permissions})
 
 @app.route('/api/permissions/<key>', methods=['PUT'])
-@requires_auth
 def toggle_permission(key):
-    """تبديل صلاحية"""
     conn = get_db()
     cursor = conn.cursor()
     
@@ -327,15 +241,14 @@ def toggle_permission(key):
 
 # ============= MAIN =============
 
-# تشغيل init_db عند تحميل الموديول (لـ gunicorn)
-init_db()
-
 if __name__ == '__main__':
+    init_db()
     print("=" * 50)
     print("DCA Dashboard Server")
     print("=" * 50)
+    print("\nUsername: dca")
+    print("Password: dca2026@iraq")
     print("\nDashboard: http://localhost:5000")
-    print("API: http://localhost:5000/api/businesses")
     print("\nPress Ctrl+C to stop\n")
     
     app.run(host='0.0.0.0', port=5000, debug=True)

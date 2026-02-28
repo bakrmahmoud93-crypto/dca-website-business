@@ -12,8 +12,18 @@ import os
 app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
 CORS(app, supports_credentials=True)
 
-# قاعدة البيانات
-DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
+# قاعدة البيانات - استخدم /tmp في البيئات السحابية
+import tempfile
+DATA_DIR = os.environ.get('DATA_DIR', os.path.dirname(os.path.abspath(__file__)))
+try:
+    test_file = os.path.join(DATA_DIR, '.write_test')
+    with open(test_file, 'w') as f:
+        f.write('test')
+    os.remove(test_file)
+except:
+    DATA_DIR = tempfile.gettempdir()
+    print(f"Using temp directory: {DATA_DIR}")
+DATABASE = os.path.join(DATA_DIR, 'database.db')
 
 # مصادقة بسيطة
 AUTH_USERNAME = "dca"

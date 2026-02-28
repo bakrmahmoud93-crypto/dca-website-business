@@ -2,30 +2,26 @@
 Flask Backend - داشبورد مستضاف
 """
 
-from flask import Flask, render_template, jsonify, request, Response, send_from_directory
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import sqlite3
-import json
-from datetime import datetime
 import os
+import sys
+
+# Debug: print to stderr so it shows in logs
+print(f"Python version: {sys.version}", file=sys.stderr)
+print(f"Working directory: {os.getcwd()}", file=sys.stderr)
 
 app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
 CORS(app, supports_credentials=True)
 
-# قاعدة البيانات - استخدم /tmp في البيئات السحابية
+# قاعدة البيانات
 import tempfile
-DATA_DIR = os.environ.get('DATA_DIR', os.path.dirname(os.path.abspath(__file__)))
-try:
-    test_file = os.path.join(DATA_DIR, '.write_test')
-    with open(test_file, 'w') as f:
-        f.write('test')
-    os.remove(test_file)
-except:
-    DATA_DIR = tempfile.gettempdir()
-    print(f"Using temp directory: {DATA_DIR}")
-DATABASE = os.path.join(DATA_DIR, 'database.db')
+DATA_DIR = tempfile.gettempdir()
+DATABASE = os.path.join(DATA_DIR, 'dca_database.db')
+print(f"Database path: {DATABASE}", file=sys.stderr)
 
-# مصادقة بسيطة
+# مصادحة
 AUTH_USERNAME = "dca"
 AUTH_PASSWORD = "dca2026@iraq"
 
@@ -52,6 +48,7 @@ def get_db():
     return conn
 
 def init_db():
+    print("Initializing database...", file=sys.stderr)
     conn = get_db()
     cursor = conn.cursor()
     
@@ -87,111 +84,41 @@ def init_db():
         )
     ''')
     
+    # بيانات تجريبية
+    cursor.execute('SELECT COUNT(*) FROM businesses')
+    if cursor.fetchone()[0] == 0:
+        sample_data = [
+            ('عيادة الأسنان المتميزة', '+9647701234567', 'clinic', 'بغداد، المنصور', 'عيادة أسنان متخصصة'),
+            ('مطعم البيت العراقي', '+9647709876543', 'restaurant', 'بغداد، الكرادة', 'مطعم عراقي تقليدي'),
+            ('صالون الأناقة', '+9647705551234', 'salon', 'بغداد، الجادرية', 'صالون حلاقة رجالي'),
+        ]
+        for data in sample_data:
+            cursor.execute('INSERT INTO businesses (name, phone, category, address, description) VALUES (?, ?, ?, ?, ?)', data)
+    
+    # صلاحيات افتراضية
     default_permissions = [
         ('auto_send', 0),
         ('auto_deploy', 1),
         ('auto_followup', 0),
         ('night_mode', 0)
     ]
-    
-    for key, enabled in default_permissions:
-        cursor.execute('INSERT OR IGNORE INTO permissions (key, enabled) VALUES (?, ?)', (key, enabled))
+    for key, value in default_permissions:
+        cursor.execute('INSERT OR IGNORE INTO permissions (key, enabled) VALUES (?, ?)', (key, value))
     
     conn.commit()
     conn.close()
+    print("Database initialized successfully!", file=sys.stderr)
 
-# ============= ROUTES =============
+# Initialize on import
+init_db()
 
 @app.route('/')
 @requires_auth
-def dashboard():
-    return render_template('index.html')
+def index():
+    return app.send_static_file('index.html')
 
-# ============= API (بدون مصادقة للتسهيل) =============
-
-@app.route('/api/businesses', methods=['GET'])
-def get_businesses():
-    status = request.args.get('status')
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    if status:
-        cursor.execute('SELECT * FROM businesses WHERE status = ? ORDER BY created_at DESC', (status,))
-    else:
-        cursor.execute('SELECT * FROM businesses ORDER BY created_at DESC')
-    
-    businesses = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    
-    return jsonify({'success': True, 'businesses': businesses})
-
-@app.route('/api/businesses', methods=['POST'])
-def add_business():
-    data = request.json
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        INSERT INTO businesses (name, phone, category, address, description)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (data.get('name'), data.get('phone'), data.get('category', 'other'), data.get('address', ''), data.get('description', '')))
-    
-    business_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True, 'id': business_id})
-
-@app.route('/api/businesses/<int:business_id>', methods=['GET'])
-def get_business(business_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM businesses WHERE id = ?', (business_id,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        return jsonify({'success': True, 'business': dict(row)})
-    return jsonify({'success': False, 'error': 'Not found'}), 404
-
-@app.route('/api/businesses/<int:business_id>/status', methods=['PUT'])
-def update_status(business_id):
-    data = request.json
-    new_status = data.get('status')
-    price = data.get('price')
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    if new_status == 'sent':
-        cursor.execute('''
-            UPDATE businesses SET status = ?, sent_at = ?, website_url = ?
-            WHERE id = ?
-        ''', (new_status, datetime.now().isoformat(), data.get('website_url'), business_id))
-    elif new_status == 'sold':
-        cursor.execute('''
-            UPDATE businesses SET status = ?, sold_at = ?, price = ?
-            WHERE id = ?
-        ''', (new_status, datetime.now().isoformat(), price, business_id))
-    else:
-        cursor.execute('UPDATE businesses SET status = ? WHERE id = ?', (new_status, business_id))
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True})
-
-@app.route('/api/businesses/<int:business_id>', methods=['DELETE'])
-def delete_business(business_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM businesses WHERE id = ?', (business_id,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True})
-
-@app.route('/api/stats', methods=['GET'])
+@app.route('/api/stats')
+@requires_auth
 def get_stats():
     conn = get_db()
     cursor = conn.cursor()
@@ -205,8 +132,8 @@ def get_stats():
     cursor.execute('SELECT COUNT(*) FROM businesses WHERE status = "sold"')
     sold = cursor.fetchone()[0]
     
-    cursor.execute('SELECT SUM(price) FROM businesses WHERE status = "sold"')
-    revenue = cursor.fetchone()[0] or 0
+    cursor.execute('SELECT COALESCE(SUM(price), 0) FROM businesses WHERE status = "sold"')
+    revenue = cursor.fetchone()[0]
     
     conn.close()
     
@@ -220,11 +147,84 @@ def get_stats():
         }
     })
 
-@app.route('/api/permissions', methods=['GET'])
+@app.route('/api/businesses')
+@requires_auth
+def get_businesses():
+    status = request.args.get('status', 'prospect')
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM businesses WHERE status = ? ORDER BY created_at DESC', (status,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    businesses = []
+    for row in rows:
+        businesses.append({
+            'id': row['id'],
+            'name': row['name'],
+            'phone': row['phone'],
+            'category': row['category'],
+            'address': row['address'],
+            'description': row['description'],
+            'status': row['status'],
+            'website_url': row['website_url'],
+            'price': row['price']
+        })
+    
+    return jsonify({'success': True, 'businesses': businesses})
+
+@app.route('/api/businesses', methods=['POST'])
+@requires_auth
+def add_business():
+    data = request.json
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO businesses (name, phone, category, address, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (
+        data.get('name'),
+        data.get('phone'),
+        data.get('category', 'other'),
+        data.get('address'),
+        data.get('description')
+    ))
+    
+    conn.commit()
+    business_id = cursor.lastrowid
+    conn.close()
+    
+    return jsonify({'success': True, 'id': business_id})
+
+@app.route('/api/businesses/<int:business_id>/status', methods=['PUT'])
+@requires_auth
+def update_status(business_id):
+    data = request.json
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE businesses SET status = ?, price = ?, sent_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ''', (data.get('status'), data.get('price'), business_id))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/permissions')
+@requires_auth
 def get_permissions():
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM permissions')
+    
+    cursor.execute('SELECT key, enabled FROM permissions')
     rows = cursor.fetchall()
     conn.close()
     
@@ -232,6 +232,7 @@ def get_permissions():
     return jsonify({'success': True, 'permissions': permissions})
 
 @app.route('/api/permissions/<key>', methods=['PUT'])
+@requires_auth
 def toggle_permission(key):
     conn = get_db()
     cursor = conn.cursor()
@@ -249,16 +250,5 @@ def toggle_permission(key):
     conn.close()
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
-# ============= MAIN =============
-
 if __name__ == '__main__':
-    init_db()
-    print("=" * 50)
-    print("DCA Dashboard Server")
-    print("=" * 50)
-    print("\nUsername: dca")
-    print("Password: dca2026@iraq")
-    print("\nDashboard: http://localhost:5000")
-    print("\nPress Ctrl+C to stop\n")
-    
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)

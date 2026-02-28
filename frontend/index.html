@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCA Dashboard - لوحة التحكم</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; }
+        .container { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: #1a1a2e; padding: 20px; border-right: 1px solid #2a2a4a; }
+        .logo { display: flex; align-items: center; gap: 10px; padding: 20px 0; border-bottom: 1px solid #2a2a4a; margin-bottom: 20px; }
+        .logo-icon { width: 50px; height: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .logo h1 { font-size: 1.5em; color: #fff; }
+        .logo span { font-size: 0.8em; color: #888; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 15px; border-radius: 10px; cursor: pointer; transition: all 0.3s; margin-bottom: 5px; }
+        .nav-item:hover, .nav-item.active { background: #2a2a4a; }
+        .nav-item.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .main { flex: 1; padding: 30px; overflow-y: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h2 { font-size: 1.8em; color: #fff; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #1a1a2e; border-radius: 15px; padding: 25px; border: 1px solid #2a2a4a; }
+        .stat-card .icon { font-size: 32px; margin-bottom: 10px; }
+        .stat-card .value { font-size: 2em; font-weight: bold; color: #fff; }
+        .stat-card .label { color: #888; font-size: 0.9em; }
+        .business-list { background: #1a1a2e; border-radius: 15px; border: 1px solid #2a2a4a; overflow: hidden; }
+        .list-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #2a2a4a; }
+        .business-item { display: flex; align-items: center; padding: 20px; border-bottom: 1px solid #2a2a4a; transition: background 0.3s; }
+        .business-item:hover { background: #252540; }
+        .business-icon { width: 50px; height: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-left: 15px; }
+        .business-info { flex: 1; }
+        .business-name { font-weight: bold; color: #fff; margin-bottom: 5px; }
+        .business-details { font-size: 0.9em; color: #888; }
+        .business-actions { display: flex; gap: 10px; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: all 0.3s; font-size: 14px; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-secondary { background: #2a2a4a; color: #fff; }
+        .badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8em; font-weight: bold; }
+        .badge-pending { background: #fbbf24; color: #000; }
+        .badge-sent { background: #3b82f6; color: #fff; }
+        .badge-interested { background: #10b981; color: #fff; }
+        .badge-sold { background: #8b5cf6; color: #fff; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #1a1a2e; border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { color: #fff; font-size: 1.5em; }
+        .close-btn { background: none; border: none; color: #888; font-size: 24px; cursor: pointer; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #888; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #2a2a4a; background: #0f0f23; color: #fff; font-size: 14px; }
+        .permission-toggle { display: flex; align-items: center; gap: 10px; padding: 15px; background: #0f0f23; border-radius: 10px; margin-bottom: 10px; }
+        .toggle { width: 50px; height: 26px; background: #2a2a4a; border-radius: 13px; position: relative; cursor: pointer; transition: background 0.3s; }
+        .toggle.active { background: #667eea; }
+        .toggle::after { content: ''; position: absolute; width: 22px; height: 22px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: left 0.3s; }
+        .toggle.active::after { left: 26px; }
+        .empty-state { text-align: center; padding: 60px 20px; }
+        .empty-state .icon { font-size: 64px; margin-bottom: 20px; }
+        .empty-state h3 { color: #fff; margin-bottom: 10px; }
+        .empty-state p { color: #888; }
+        .loading { text-align: center; padding: 40px; color: #888; }
+        @media (max-width: 768px) { .sidebar { display: none; } .stats { grid-template-columns: 1fr 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🛡️</div>
+                <div>
+                    <h1>DCA</h1>
+                    <span>Website Business</span>
+                </div>
+            </div>
+            <nav>
+                <div class="nav-item active" onclick="showSection('dashboard')"><span>📊</span><span>لوحة التحكم</span></div>
+                <div class="nav-item" onclick="showSection('prospects')"><span>🎯</span><span>الزبائن المحتملين</span></div>
+                <div class="nav-item" onclick="showSection('sent')"><span>📤</span><span>المواقع المرسلة</span></div>
+                <div class="nav-item" onclick="showSection('sold')"><span>💰</span><span>المبيعات</span></div>
+                <div class="nav-item" onclick="showSection('permissions')"><span>🔐</span><span>الصلاحيات</span></div>
+            </nav>
+        </div>
+        
+        <div class="main">
+            <div id="dashboard-section" class="section">
+                <div class="header">
+                    <h2>📊 لوحة التحكم</h2>
+                    <button class="btn btn-primary" onclick="openModal('add-business')">+ إضافة زبون</button>
+                </div>
+                <div class="stats">
+                    <div class="stat-card"><div class="icon">🎯</div><div class="value" id="stat-prospects">-</div><div class="label">زبائن محتملين</div></div>
+                    <div class="stat-card"><div class="icon">📤</div><div class="value" id="stat-sent">-</div><div class="label">مواقع مرسلة</div></div>
+                    <div class="stat-card"><div class="icon">💰</div><div class="value" id="stat-sold">-</div><div class="label">مبيعات مكتملة</div></div>
+                    <div class="stat-card"><div class="icon">💵</div><div class="value" id="stat-revenue">$0</div><div class="label">الإيرادات</div></div>
+                </div>
+                <div class="business-list">
+                    <div class="list-header"><h3>🔥 الزبائن المقترحين</h3><button class="btn btn-secondary" onclick="refreshProspects()">تحديث</button></div>
+                    <div id="prospects-list"><div class="loading">جاري التحميل...</div></div>
+                </div>
+            </div>
+            
+            <div id="prospects-section" class="section" style="display: none;">
+                <div class="header"><h2>🎯 الزبائن المحتملين</h2><button class="btn btn-primary" onclick="openModal('add-business')">+ إضافة</button></div>
+                <div class="business-list"><div id="all-prospects-list"><div class="loading">جاري التحميل...</div></div></div>
+            </div>
+            
+            <div id="sent-section" class="section" style="display: none;">
+                <div class="header"><h2>📤 المواقع المرسلة</h2></div>
+                <div class="business-list"><div id="sent-list"><div class="loading">جاري التحميل...</div></div></div>
+            </div>
+            
+            <div id="sold-section" class="section" style="display: none;">
+                <div class="header"><h2>💰 المبيعات المكتملة</h2></div>
+                <div class="business-list"><div id="sold-list"><div class="loading">جاري التحميل...</div></div></div>
+            </div>
+            
+            <div id="permissions-section" class="section" style="display: none;">
+                <div class="header"><h2>🔐 صلاحيات البوت</h2></div>
+                <div class="business-list" style="padding: 20px;">
+                    <h3 style="margin-bottom: 20px; color: #fff;">تحكم بصلاحيات حسام</h3>
+                    <div class="permission-toggle" onclick="togglePermission('auto_send')"><div class="toggle" id="toggle-auto_send"></div><div><strong>إرسال تلقائي</strong><p style="font-size: 0.9em; color: #888;">السماح للبوت بإرسال المواقع بدون موافقة</p></div></div>
+                    <div class="permission-toggle" onclick="togglePermission('auto_deploy')"><div class="toggle" id="toggle-auto_deploy"></div><div><strong>نشر تلقائي</strong><p style="font-size: 0.9em; color: #888;">نشر المواقع على دومين مجاني تلقائياً</p></div></div>
+                    <div class="permission-toggle" onclick="togglePermission('auto_followup')"><div class="toggle" id="toggle-auto_followup"></div><div><strong>متابعة تلقائية</strong><p style="font-size: 0.9em; color: #888;">إرسال رسائل متابعة للزبائن</p></div></div>
+                    <div class="permission-toggle" onclick="togglePermission('night_mode')"><div class="toggle" id="toggle-night_mode"></div><div><strong>وضع هادئ</strong><p style="font-size: 0.9em; color: #888;">عدم الإرسال من 11م - 8ص</p></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="add-business-modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>➕ إضافة زبون جديد</h3><button class="close-btn" onclick="closeModal('add-business')">&times;</button></div>
+            <div class="form-group"><label>اسم العمل *</label><input type="text" id="business-name" placeholder="مثال: عيادة الأسنان المتميزة"></div>
+            <div class="form-group"><label>الفئة</label><select id="business-category"><option value="clinic">عيادة / مستشفى</option><option value="restaurant">مطعم / كافي</option><option value="salon">صالون حلاقة / جمال</option><option value="shop">محل / متجر</option><option value="other">أخرى</option></select></div>
+            <div class="form-group"><label>الهاتف *</label><input type="text" id="business-phone" placeholder="+9647701234567"></div>
+            <div class="form-group"><label>العنوان</label><input type="text" id="business-address" placeholder="بغداد، المنصور"></div>
+            <div class="form-group"><label>وصف مختصر</label><textarea id="business-description" rows="3" placeholder="وصف قصير عن العمل..."></textarea></div>
+            <div style="display: flex; gap: 10px;"><button class="btn btn-secondary" onclick="closeModal('add-business')">إلغاء</button><button class="btn btn-primary" onclick="addBusiness()">إضافة</button></div>
+        </div>
+    </div>
+
+    <script>
+        // API URL - سيتغير عند النشر
+        const API_URL = window.location.origin + '/api';
+        
+        // تحميل البيانات
+        async function loadData() {
+            try {
+                // إحصائيات
+                const statsRes = await fetch(`${API_URL}/stats`);
+                const statsData = await statsRes.json();
+                if (statsData.success) {
+                    document.getElementById('stat-prospects').textContent = statsData.stats.prospects;
+                    document.getElementById('stat-sent').textContent = statsData.stats.sent;
+                    document.getElementById('stat-sold').textContent = statsData.stats.sold;
+                    document.getElementById('stat-revenue').textContent = '$' + statsData.stats.revenue;
+                }
+                
+                // الزبائن
+                await loadBusinesses();
+                
+                // الصلاحيات
+                const permRes = await fetch(`${API_URL}/permissions`);
+                const permData = await permRes.json();
+                if (permData.success) {
+                    Object.keys(permData.permissions).forEach(key => {
+                        const toggle = document.getElementById('toggle-' + key);
+                        if (toggle && permData.permissions[key]) {
+                            toggle.classList.add('active');
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('prospects-list').innerHTML = '<div class="empty-state"><div class="icon">❌</div><h3>خطأ في الاتصال</h3><p>تأكد من تشغيل السيرفر</p></div>';
+            }
+        }
+        
+        async function loadBusinesses() {
+            const [prospectRes, sentRes, soldRes] = await Promise.all([
+                fetch(`${API_URL}/businesses?status=prospect`),
+                fetch(`${API_URL}/businesses?status=sent`),
+                fetch(`${API_URL}/businesses?status=sold`)
+            ]);
+            
+            const prospects = await prospectRes.json();
+            const sent = await sentRes.json();
+            const sold = await soldRes.json();
+            
+            renderBusinessList('prospects-list', prospects.businesses || []);
+            renderBusinessList('all-prospects-list', prospects.businesses || []);
+            renderBusinessList('sent-list', sent.businesses || []);
+            renderBusinessList('sold-list', sold.businesses || []);
+        }
+        
+        function renderBusinessList(containerId, businesses) {
+            const container = document.getElementById(containerId);
+            if (!businesses || businesses.length === 0) {
+                if (containerId === 'prospects-list') {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>لا يوجد زبائن بعد</h3><p>أضف زبائن يدوياً أو شغل السكرابر</p></div>';
+                } else {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>لا توجد بيانات</h3></div>';
+                }
+                return;
+            }
+            
+            container.innerHTML = businesses.map(b => `
+                <div class="business-item">
+                    <div class="business-icon">${getCategoryIcon(b.category)}</div>
+                    <div class="business-info">
+                        <div class="business-name">${b.name}</div>
+                        <div class="business-details">${b.phone || ''} | ${b.address || 'لا يوجد عنوان'}</div>
+                    </div>
+                    <span class="badge badge-${b.status === 'prospect' ? 'pending' : b.status}">${getStatusText(b.status)}</span>
+                    <div class="business-actions">
+                        ${b.status === 'prospect' ? `<button class="btn btn-primary" onclick="generateSite(${b.id})">توليد موقع</button>` : ''}
+                        ${b.status === 'sent' ? `<button class="btn btn-success" onclick="markAsSold(${b.id})">تم البيع</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function getCategoryIcon(category) {
+            const icons = { 'clinic': '🏥', 'restaurant': '🍽️', 'salon': '💇', 'shop': '🏪', 'other': '🏢' };
+            return icons[category] || '🏢';
+        }
+        
+        function getStatusText(status) {
+            const texts = { 'prospect': 'معلق', 'sent': 'مرسل', 'interested': 'مهتم', 'sold': 'مباع' };
+            return texts[status] || status;
+        }
+        
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+            document.getElementById(section + '-section').style.display = 'block';
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+        
+        function openModal(name) { document.getElementById(name + '-modal').classList.add('active'); }
+        function closeModal(name) { document.getElementById(name + '-modal').classList.remove('active'); }
+        
+        async function addBusiness() {
+            const name = document.getElementById('business-name').value;
+            const phone = document.getElementById('business-phone').value;
+            const category = document.getElementById('business-category').value;
+            const address = document.getElementById('business-address').value;
+            const description = document.getElementById('business-description').value;
+            
+            if (!name || !phone) { alert('يرجى إدخال الاسم والهاتف'); return; }
+            
+            const res = await fetch(`${API_URL}/businesses`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone, category, address, description })
+            });
+            
+            if ((await res.json()).success) {
+                closeModal('add-business');
+                loadData();
+                document.getElementById('business-name').value = '';
+                document.getElementById('business-phone').value = '';
+                document.getElementById('business-address').value = '';
+                document.getElementById('business-description').value = '';
+            }
+        }
+        
+        async function generateSite(id) {
+            alert(`سيتم توليد موقع للزبون #${id}\nالرابط سيظهر هنا بعد الرفع`);
+            // تحديث الحالة
+            await fetch(`${API_URL}/businesses/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'sent' })
+            });
+            loadData();
+        }
+        
+        async function markAsSold(id) {
+            const price = prompt('أدخل السعر بالدولار:', '150');
+            if (price) {
+                await fetch(`${API_URL}/businesses/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'sold', price: parseInt(price) })
+                });
+                loadData();
+            }
+        }
+        
+        async function togglePermission(key) {
+            const res = await fetch(`${API_URL}/permissions/${key}`, { method: 'PUT' });
+            const data = await res.json();
+            if (data.success) {
+                const toggle = document.getElementById('toggle-' + key);
+                toggle.classList.toggle('active', data.enabled);
+            }
+        }
+        
+        function refreshProspects() {
+            alert('للحصول على زبائن جدد، شغل السكرابر:\n\npython backend/scraper_scheduler.py');
+        }
+        
+        // تحميل البيانات عند البدء
+        loadData();
+    </script>
+</body>
+</html>

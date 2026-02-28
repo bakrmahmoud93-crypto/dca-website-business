@@ -1,0 +1,35 @@
+{
+  "schema": "iraq_website_business_v1",
+  "description": "قاعدة بيانات الشركات بدون موقع",
+  "businesses": [
+    {
+      "id": 1,
+      "name": "عيادة الأسنان المتميزة",
+      "phone": "+9647701234567",
+      "category": "clinic",
+      "address": "بغداد، المنصور",
+      "description": "عيادة أسنان متخصصة",
+      "status": "prospect",
+      "website_url": null,
+      "created_at": "2026-02-28T18:59:02.287490"
+    },
+    {
+      "id": 2,
+      "name": "عيادة الأسنان المتميزة",
+      "phone": "+9647701234567",
+      "category": "clinic",
+      "address": "بغداد، المنصور",
+      "description": "عيادة أسنان متخصصة",
+      "status": "prospect",
+      "website_url": null,
+      "created_at": "2026-02-28T19:17:56.231358"
+    }
+  ],
+  "stats": {
+    "total": 2,
+    "no_website": 0,
+    "contacted": 0,
+    "interested": 0,
+    "sold": 0
+  }
+}
